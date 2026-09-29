@@ -49,7 +49,7 @@ export function Segmented<V extends string>({ value, onChange, options, name, te
           onClick={() => onChange(o.value)}
           className={cn(
             'min-h-[44px] rounded-full px-4 text-sm font-semibold transition-[background-color,color,box-shadow] duration-200',
-            value === o.value ? 'bg-surface text-ink shadow-soft' : 'text-ink/80 hover:text-ink',
+            value === o.value ? 'bg-surface text-ink shadow-soft ring-1 ring-lavender/60' : 'text-ink/80 hover:text-ink',
           )}
         >
           {o.label}

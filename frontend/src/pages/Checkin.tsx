@@ -10,9 +10,9 @@ import { BreathingOrb } from '../components/calm/BreathingOrb';
 import { ErrorState } from '../components/common/ErrorState';
 import { SunShape } from '../components/decor/Illustrations';
 import { getServices } from '../services';
-import { useProfile, useAuth } from '../app/auth';
+import { useProfile, useAuth, setProfileCache } from '../app/auth';
 import { en } from '../copy/en';
-import type { Profile, Questionnaire } from '../types/api';
+import type { Questionnaire } from '../types/api';
 
 type Step = { kind: 'q'; i: number } | { kind: 'pause'; text: string };
 
@@ -55,9 +55,6 @@ export default function Checkin() {
   const cur = steps[step];
   const total = q.data?.items.length ?? 29;
   const qNum = steps.slice(0, step + 1).filter((s) => s.kind === 'q').length;
-
-  const setMeStatus = (status: Profile['assessment_status']) =>
-    me && qc.setQueryData<Profile>(['me', session?.user_id], { ...me, assessment_status: status });
 
   const submit = useCallback(async (all: Record<string, number | null>) => {
     if (!q.data) return;
@@ -102,15 +99,14 @@ export default function Checkin() {
   const saveLater = async () => {
     assessmentService.saveDraft({ answers, step, updated_at: new Date().toISOString() });
     if (me?.assessment_status !== 'completed') {
-      await profileService.updateMe({ assessment_status: 'in_progress' });
-      setMeStatus('in_progress');
+      setProfileCache(qc, await profileService.updateMe({ assessment_status: 'in_progress' }));
     }
     navigate('/app/chat');
   };
 
   const skip = async () => {
     await assessmentService.skip();
-    if (me?.assessment_status !== 'completed') setMeStatus('skipped');
+    setProfileCache(qc, await profileService.getMe());
     navigate('/app/chat');
   };
 

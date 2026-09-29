@@ -1,0 +1,76 @@
+{
+  "summary": "Frontend-only E2E test of Aura mock app. Ran signup → consent → check-in → results → chat → sidebar → settings → mobile → logout. Nearly all flows work. Two issues: (1) 'Save & finish later' produces a redirect loop back to /onboarding/checkin because the useProfile React Query cache is not invalidated after updateMe({assessment_status:'in_progress'}), so the Gate guard still sees 'not_started' and redirects. (2) Signup spec requires a show/hide password toggle (auth-password-toggle), but no such testid or toggle button exists in the UI. All mock triggers (test-high, test-imminent, test-error, test-limit) work correctly. Crisis modal shows US 988 resources + intl link. Theme=night and accent=sage persist in html data-attributes. Mobile drawer opens via mobile-menu-button. Session titles are correctly derived from the first 4 words (title-cased) of the first user message. No console errors observed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Checkin.tsx / guards.tsx", "issue": "'Save & finish later' does not reach /app/chat: after profileService.updateMe({assessment_status:'in_progress'}) the useProfile query cache is NOT invalidated. The Gate guard reads stale p.assessment_status === 'not_started' on /app and redirects back to /onboarding/checkin. The setMeStatus() local state update is insufficient — need to invalidate/setQueryData for the ['profile'] query (or await refetch) before navigate('/app/chat').", "selector": "text=Save & finish later", "priority": "HIGH"},
+      {"component": "Signup.tsx", "issue": "Missing show/hide password toggle. Spec expects a toggle to switch input type between password and text; no button rendered and no data-testid='auth-password-toggle'. Login likely has same gap.", "selector": "[data-testid=auth-password-toggle]", "priority": "MEDIUM"},
+      {"component": "Chat / Checkin banner", "issue": "Because of bug #1, the finish-checkin-banner on /app/chat could not be verified. Once the redirect loop is fixed the banner needs to render for users whose assessment_status='in_progress'.", "selector": "[data-testid=finish-checkin-banner]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_working": [
+    "Landing headline + landing-start-button → /signup",
+    "Signup inline email validation ('doesn't look like an email yet')",
+    "Signup → /onboarding/consent",
+    "Consent: submit disabled until all 3 checkboxes checked",
+    "consent-crisis-link opens crisis-modal (with 988 + intl link + close)",
+    "Consent → /onboarding/checkin",
+    "Check-in one question per screen, options 0-3, keyboard 1-4 works",
+    "Check-in resume: reloading /onboarding/checkin resumes at question 3 of 29 after 2 answers",
+    "Skip for now on first screen navigates to /app/chat",
+    "3 interstitial 'Continue' screens encountered while answering 29 questions",
+    "29 questions completed → /onboarding/results",
+    "Results: weather-radar (1), brightness-gauge (1), dimension list rows with word descriptors ('quiet', etc., no numeric percentages shown)",
+    "Chat page greeting 'Hi Maya. …no agenda here…'",
+    "4 suggestion chips shown; clicking chip fills chat-input with its text",
+    "chat-send-button disabled when input empty",
+    "Enter sends, Shift+Enter inserts newline",
+    "Sending navigates to /app/chat/:id and assistant-thinking (BreathingOrb) is shown, followed by streamed assistant reply",
+    "Copy button appears on assistant messages",
+    "Mock trigger [test-high] → crisis-card rendered after assistant reply; input stays enabled",
+    "Mock trigger [test-imminent] → crisis-modal auto-opens",
+    "Mock trigger [test-error] → 'That didn't go through…' + message-retry-button rendered",
+    "Mock trigger [test-limit] → rest-card rendered",
+    "Session title derived from first 4 words title-cased ('Hello Aura Please Help')",
+    "Sidebar session item shown under TODAY group after reload (mobile drawer confirmed)",
+    "Support pill opens crisis-modal with US 988 resources and crisis-intl-link (verified on onboarding + chat)",
+    "Settings theme night sets html[data-theme=night] and persists across reload",
+    "Accent swatch sage sets html[data-accent=sage]",
+    "Settings 'Delete all my chats' and 'Delete account' buttons exist",
+    "Mobile viewport (390x844): mobile-menu-button opens sidebar-mobile drawer",
+    "Logout button returns to /login",
+    "No console errors during any flow"
+  ],
+  "not_fully_verified": [
+    "Show/hide password toggle (feature appears missing)",
+    "Save & finish later → finish-checkin-banner on /app/chat (blocked by redirect-loop bug)",
+    "safe_01 > 0 results-support-card ABOVE chart (only tested with all 'Not at all' answers; need to answer safe_01 with option > 0 to verify)",
+    "Session rename/delete inline flow (after page reload the useSessions query was still empty in the desktop timing window; feature confirmed to render in mobile drawer so testids may still be correct — main agent should self-verify)",
+    "3500 chars counter and per-session draft persistence on reload",
+    "Streaming Stop button (chat-stop-button) preserving partial text",
+    "Random inline tool-sheet [[tool:breathing]] injection (1-in-6, not deterministic)",
+    "Calm corner breathing tool presets 1/2/5 min + phase text; grounding stepper",
+    "Delete account typing DELETE → logs out",
+    "Public routes /crisis /privacy /terms"
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "Fix 'Save & finish later' redirect loop: after profileService.updateMe(...) in Checkin.saveLater(), invalidate or setQueryData for the ['profile'] React Query so Gate on /app sees fresh assessment_status='in_progress'. Same applies to skip() which currently works only because assessment_status='skipped' also isn't 'not_started' — verify no similar staleness.",
+    "Add show/hide password toggle to Signup and Login with data-testid='auth-password-toggle' (spec requirement).",
+    "Confirm finish-checkin-banner (data-testid='finish-checkin-banner') renders on /app/chat when profile.assessment_status === 'in_progress'."
+  ],
+  "critical_code_review_comments": [
+    "guards.tsx Gate depends on useProfile cache; any code path that mutates profile MUST invalidate/setQueryData(['profile']) before navigate, otherwise the guard bounces the user back. This is a general pattern risk across Consent/Settings too.",
+    "Consider using queryClient.setQueryData(['profile'], updated) or invalidateQueries + await refetch inside profileService wrapper hooks so future callers can't forget."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (frontend-only)", "frontend": "~90% of listed scenarios verified"},
+  "test_credentials": "Mock auth. Signed up multiple accounts (maya_test/maya2_test/maya3_test/maya4_test/maya5_test @example.com, pwd secret123, country US).",
+  "seed_data_creation": "None — mock adapters persist to localStorage; each test cleared localStorage first.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Skipped deep testing of Calm corner, streaming Stop button, char counter/draft persistence, delete-account typing gate, and public /crisis /privacy /terms routes. Also did not verify results-support-card visibility with safe_01>0. After main agent fixes the 'Save & finish later' guard-cache issue, please retest finish-checkin-banner. All main testids used in this run matched the app; the only missing one was auth-password-toggle.",
+  "rca of the issue": "'Save & finish later': Checkin.saveLater() calls profileService.updateMe({assessment_status:'in_progress'}) then setMeStatus('in_progress') then navigate('/app/chat'). The Gate guard on /app reads profile via useProfile() (React Query key ['profile']). setMeStatus is a local zustand/store setter but useProfile's cache still holds the pre-update profile with assessment_status='not_started'. Gate then executes `stage === 'app' && p.assessment_status === 'not_started'` → Navigate to /onboarding/checkin. Reproduction: signup → complete consent → answer 1-2 questions → click 'Save & finish later'. Expected: land on /app/chat with finish-checkin-banner visible. Actual: bounced back to /onboarding/checkin resuming at question 2. Mitigation: In the updateMe call site (or inside a useUpdateProfile mutation) do `queryClient.setQueryData(['profile'], updated)` or `await queryClient.invalidateQueries({queryKey:['profile']}); await queryClient.refetchQueries(...)` before navigating."
+}

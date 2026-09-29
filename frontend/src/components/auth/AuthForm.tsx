@@ -73,7 +73,7 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
             aria-describedby={err('password') ? 'password-error' : undefined} data-testid="auth-password-input" />
           <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? en.auth.hidePassword : en.auth.showPassword}
             className="absolute right-1 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full text-muted hover:bg-soft hover:text-ink"
-            data-testid="auth-toggle-password">
+            data-testid="auth-password-toggle">
             {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
           </button>
         </div>
