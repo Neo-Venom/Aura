@@ -63,6 +63,7 @@ export default function Checkin() {
     try {
       const result = await assessmentService.submit(q.data.items.map((it) => ({ item_id: it.id, value: all[it.id] ?? null })));
       qc.setQueryData(['assessment', 'latest', session?.user_id], result);
+      qc.invalidateQueries({ queryKey: ['assessment', 'history'] });
       qc.invalidateQueries({ queryKey: ['me'] });
       assessmentService.clearDraft();
       navigate('/onboarding/results');

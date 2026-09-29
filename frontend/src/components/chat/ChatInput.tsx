@@ -17,10 +17,11 @@ interface Props {
   draftId: string;
   seed?: { text: string; n: number };
   autoSendVoice: boolean;
+  voiceLang?: string | null;
   autoFocus?: boolean;
 }
 
-export function ChatInput({ onSend, onStop, streaming, draftId, seed, autoSendVoice, autoFocus }: Props) {
+export function ChatInput({ onSend, onStop, streaming, draftId, seed, autoSendVoice, voiceLang, autoFocus }: Props) {
   const [value, setValue] = useState(() => localStorage.getItem(draftKey(draftId)) ?? '');
   const [mode, setMode] = useState<InputMode>('text');
   const ref = useRef<HTMLTextAreaElement>(null);
@@ -39,6 +40,7 @@ export function ChatInput({ onSend, onStop, streaming, draftId, seed, autoSendVo
     getValue: () => valueRef.current,
     setValue: (v) => { setValue(v.slice(0, MAX)); setMode('voice'); },
     autoSend: autoSendVoice,
+    lang: voiceLang,
     onAutoSend: (t) => submit(t),
   });
 

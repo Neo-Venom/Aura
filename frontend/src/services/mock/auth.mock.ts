@@ -4,7 +4,7 @@ import type { Profile } from '../../types/api';
 
 const newProfile = (email: string, display_name: string | null, country_code: string | null): Profile => ({
   id: uid(), email, display_name, country_code, consent_given: false, assessment_status: 'not_started',
-  accent: 'apricot', theme_mode: 'light', text_size: 'md', auto_send_voice: false, created_at: nowIso(),
+  accent: 'apricot', theme_mode: 'light', text_size: 'md', auto_send_voice: false, stt_language: null, created_at: nowIso(),
 });
 
 const findByEmail = (email: string) =>

@@ -9,7 +9,7 @@ import { Button } from '../components/ui-kit/Button';
 import { Segmented, Switch } from '../components/ui-kit/Controls';
 import { useProfile, useUpdateProfile } from '../app/auth';
 import { getServices } from '../services';
-import { COUNTRIES, en } from '../copy/en';
+import { COUNTRIES, VOICE_LANGUAGES, en } from '../copy/en';
 import type { Profile } from '../types/api';
 
 function Section({ title, children, testId }: { title: string; children: ReactNode; testId: string }) {
@@ -123,6 +123,17 @@ export default function Settings() {
               <span className="block text-sm text-muted">{en.settings.autoSendHint}</span>
             </label>
             <Switch id="auto-send" testId="settings-auto-send-switch" checked={me.auto_send_voice} onCheckedChange={(v) => update.mutate({ auto_send_voice: v })} />
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <label htmlFor="voice-language" className="space-y-0.5">
+              <span className="block font-semibold">{en.settings.voiceLanguage}</span>
+              <span className="block text-sm text-muted">{en.settings.voiceLanguageHint}</span>
+            </label>
+            <select id="voice-language" className="field !w-auto" value={me.stt_language ?? ''}
+              onChange={(e) => update.mutate({ stt_language: e.target.value || null })} data-testid="settings-voice-language-select">
+              <option value="">{en.settings.browserDefault}</option>
+              {VOICE_LANGUAGES.map((l) => <option key={l.code} value={l.code} lang={l.code}>{l.name}</option>)}
+            </select>
           </div>
         </Section>
         <DataSection />

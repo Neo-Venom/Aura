@@ -89,6 +89,9 @@ export const en = {
     brightBands: { low: 'dim for now', mild: 'a few rays', moderate: 'fairly bright', high: 'shining' },
     dims: { stress: 'Stress', anxiety: 'Anxiety', low_mood: 'Low mood', anger: 'Anger', tiredness: 'Tiredness', grief: 'Grief', sadness: 'Sadness', brightness: 'Brightness' },
     taken: (d: string) => `From your check-in on ${d}`,
+    history: 'Earlier check-ins',
+    historyHint: 'Your weather over time, oldest on the left. Every sky changes.',
+    latest: 'Latest',
   },
   shell: {
     newChat: 'New chat', search: 'Search your chats', emptyHistory: 'Your conversations will live here.',
@@ -151,6 +154,9 @@ export const en = {
     accent: 'Accent colour', textSize: 'Text size', sizes: { sm: 'S', md: 'M', lg: 'L' },
     voice: 'Voice', autoSend: 'Send automatically after I stop speaking',
     autoSendHint: "Off means your words land in the box so you can read them first.",
+    voiceLanguage: 'Listening language',
+    voiceLanguageHint: 'The language the mic listens for.',
+    browserDefault: 'Same as my browser',
     data: 'Your data', retake: 'Retake check-in', download: 'Download my data',
     deleteChats: 'Delete all my chats', deleteAccount: 'Delete my account',
     deleteChatsTitle: 'Delete all your chats?', deleteChatsBody: "Every conversation will be gone for good. Your check-in and settings stay.",
@@ -171,6 +177,20 @@ export const en = {
   },
   accents: { apricot: 'Apricot', sage: 'Sage', lavender: 'Lavender', butter: 'Butter', sky: 'Sky' },
 };
+
+export const VOICE_LANGUAGES: { code: string; name: string }[] = [
+  { code: 'en-US', name: 'English (US)' },
+  { code: 'en-GB', name: 'English (UK)' },
+  { code: 'en-IN', name: 'English (India)' },
+  { code: 'en-AU', name: 'English (Australia)' },
+  { code: 'hi-IN', name: 'हिन्दी (Hindi)' },
+  { code: 'ta-IN', name: 'தமிழ் (Tamil)' },
+  { code: 'bn-IN', name: 'বাংলা (Bengali)' },
+  { code: 'es-ES', name: 'Español' },
+  { code: 'fr-FR', name: 'Français' },
+  { code: 'de-DE', name: 'Deutsch' },
+  { code: 'pt-BR', name: 'Português (Brasil)' },
+];
 
 export const COUNTRIES: { code: string; name: string }[] = [
   { code: 'US', name: 'United States' },

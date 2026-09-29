@@ -11,7 +11,7 @@ export interface SttCallbacks {
 export interface SttService {
   mode: 'browser' | 'server';
   isSupported(): boolean;
-  start(cb: SttCallbacks): Promise<void>;
+  start(cb: SttCallbacks, opts?: { lang?: string | null }): Promise<void>;
   stop(): void;
 }
 
@@ -23,11 +23,11 @@ function createBrowserStt(): SttService {
   return {
     mode: 'browser',
     isSupported: () => !!Ctor(),
-    async start(cb) {
+    async start(cb, opts) {
       const C = Ctor();
       if (!C) { cb.onError('unsupported'); return; }
       rec = new C();
-      rec.lang = navigator.language || 'en-US';
+      rec.lang = opts?.lang || navigator.language || 'en-US';
       rec.continuous = true;
       rec.interimResults = true;
       rec.onresult = (e) => {
@@ -52,7 +52,7 @@ function createServerStt(): SttService {
   return {
     mode: 'server',
     isSupported: () => typeof window !== 'undefined' && 'MediaRecorder' in window && !!navigator.mediaDevices,
-    async start(cb) {
+    async start(cb, opts) {
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -68,7 +68,7 @@ function createServerStt(): SttService {
         try {
           const fd = new FormData();
           fd.append('audio', new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' }), 'speech.webm');
-          fd.append('language', navigator.language || 'en-US');
+          fd.append('language', opts?.lang || navigator.language || 'en-US');
           // TODO(Antigravity): POST /v1/stt/transcribe (multipart: audio, language) -> { text }
           const res = await apiFetch<{ text: string }>('/v1/stt/transcribe', { method: 'POST', body: fd });
           if (res.text) cb.onFinal(res.text);

@@ -43,7 +43,7 @@ export default function Chat() {
         </h1>
         <SuggestionChips onPick={(t) => setSeed({ text: t, n: Date.now() })} />
       </div>
-      <ChatInput draftId="new" seed={seed} onSend={start} streaming={busy} autoSendVoice={!!me?.auto_send_voice} autoFocus />
+      <ChatInput draftId="new" seed={seed} onSend={start} streaming={busy} autoSendVoice={!!me?.auto_send_voice} voiceLang={me?.stt_language} autoFocus />
     </div>
   );
 }

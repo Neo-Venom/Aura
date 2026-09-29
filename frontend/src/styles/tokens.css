@@ -19,6 +19,13 @@
   --c-accent-strong: var(--c-terracotta);
   --shadow-soft: 0 10px 30px -10px rgba(129, 155, 136, 0.12);
   --shadow-lift: 0 18px 40px -16px rgba(184, 92, 68, 0.18);
+  --blob-1: 224 122 95; --blob-2: 184 169 217; --blob-3: 129 155 136; --blob-4: 242 204 143;
+  --blob-alpha: 0.32;
+  --orb-gradient: radial-gradient(circle at 35% 30%, rgb(242 204 143), rgb(224 122 95 / 0.85) 55%, rgb(184 169 217 / 0.8));
+  --orb-glow: 0 20px 60px -20px rgb(224 122 95 / 0.6);
+  --orb-halo: rgb(242 204 143 / 0.3);
+  --orb-mini-halo: rgb(242 204 143 / 0.6);
+  --orb-mini-core: rgb(224 122 95 / 0.8);
   color-scheme: light;
 }
 
@@ -40,6 +47,14 @@
   --c-ring: 178 167 206;
   --shadow-soft: 0 10px 30px -10px rgba(0, 0, 0, 0.35);
   --shadow-lift: 0 18px 40px -16px rgba(0, 0, 0, 0.45);
+  /* dusk blobs: ember, plum, deep sage, candle amber */
+  --blob-1: 196 110 84; --blob-2: 122 102 160; --blob-3: 86 118 104; --blob-4: 204 150 88;
+  --blob-alpha: 0.16;
+  --orb-gradient: radial-gradient(circle at 35% 30%, rgb(255 214 160), rgb(232 140 96 / 0.9) 55%, rgb(150 104 120 / 0.85));
+  --orb-glow: 0 0 90px 12px rgb(240 150 90 / 0.28), 0 0 32px 4px rgb(255 196 140 / 0.3);
+  --orb-halo: rgb(240 160 100 / 0.32);
+  --orb-mini-halo: rgb(245 170 110 / 0.55);
+  --orb-mini-core: rgb(240 150 100 / 0.95);
   color-scheme: dark;
 }
 

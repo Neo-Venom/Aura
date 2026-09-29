@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { WeatherRadar } from './WeatherRadar';
 import { BrightnessGauge } from './BrightnessGauge';
 import { DimensionRow } from './DimensionRow';
+import { WeatherHistory } from './WeatherHistory';
 import { CrisisCard } from '../safety/CrisisCard';
 import { Button } from '../ui-kit/Button';
 import { EmptyState } from '../common/EmptyState';
@@ -61,6 +62,7 @@ export function WeatherView({ inApp }: { inApp?: boolean }) {
       <ul className="grid gap-2" data-testid="dimension-list">
         {heavy.map((d) => <DimensionRow key={d.key} dim={d} />)}
       </ul>
+      {inApp && <WeatherHistory />}
       <div className="flex flex-wrap items-center gap-4">
         <Button size="lg" onClick={() => navigate('/app/chat')} data-testid="weather-start-talking">{en.weather.cta}</Button>
         {inApp && (

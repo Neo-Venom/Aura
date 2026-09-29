@@ -83,6 +83,7 @@ export function ChatView({ sessionId }: { sessionId: string }) {
         onStop={stop}
         streaming={phase !== 'idle'}
         autoSendVoice={!!me?.auto_send_voice}
+        voiceLang={me?.stt_language}
         autoFocus
       />
     </div>

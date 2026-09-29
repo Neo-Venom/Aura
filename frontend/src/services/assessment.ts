@@ -9,6 +9,7 @@ export interface AssessmentService {
   submit(answers: AnswerInput[]): Promise<AssessmentResult>;
   skip(): Promise<void>;
   getLatest(): Promise<AssessmentResult | null>;
+  getHistory(): Promise<AssessmentResult[]>;
   saveDraft(draft: CheckinDraft): void;
   loadDraft(): CheckinDraft | null;
   clearDraft(): void;
@@ -31,6 +32,8 @@ export const httpAssessmentService: AssessmentService = {
   skip: () => apiFetch<void>('/v1/assessment/skip', { method: 'POST' }),
   // TODO(Antigravity): GET /v1/assessment/latest -> AssessmentResult | null
   getLatest: () => apiFetch<AssessmentResult | null>('/v1/assessment/latest'),
+  // TODO(Antigravity): GET /v1/assessment/history -> AssessmentResult[] (newest first)
+  getHistory: () => apiFetch<AssessmentResult[]>('/v1/assessment/history'),
   saveDraft: (d) => draftStore.save(d),
   loadDraft: () => draftStore.load(),
   clearDraft: () => draftStore.clear(),

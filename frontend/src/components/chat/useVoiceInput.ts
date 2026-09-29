@@ -7,7 +7,7 @@ const join = (...parts: string[]) => parts.filter(Boolean).join(' ');
 const buzz = () => { try { navigator.vibrate?.(10); } catch { /* unsupported */ } };
 
 // Streams speech into the input; optionally auto-sends ~1.5s after speech stops.
-export function useVoiceInput(opts: { getValue(): string; setValue(v: string): void; autoSend: boolean; onAutoSend(text: string): void }) {
+export function useVoiceInput(opts: { getValue(): string; setValue(v: string): void; autoSend: boolean; lang?: string | null; onAutoSend(text: string): void }) {
   const { sttService } = getServices();
   const [listening, setListening] = useState(false);
   const base = useRef('');
@@ -39,7 +39,7 @@ export function useVoiceInput(opts: { getValue(): string; setValue(v: string): v
       },
       onEnd: () => { setListening(false); buzz(); },
       onError: () => { setListening(false); toast(en.chat.micUnavailable); },
-    });
+    }, { lang: o.current.lang });
   }, [sttService]);
 
   useEffect(() => () => { clearTimer(); sttService.stop(); }, [sttService]);

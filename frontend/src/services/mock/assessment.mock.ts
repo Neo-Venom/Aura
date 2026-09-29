@@ -58,6 +58,10 @@ export const mockAssessmentService: AssessmentService = {
     const list = db.load().assessments[currentUserId()] ?? [];
     return list[list.length - 1] ?? null;
   },
+  async getHistory() {
+    await latency();
+    return [...(db.load().assessments[currentUserId()] ?? [])].reverse();
+  },
   saveDraft: (d) => draftStore.save(d),
   loadDraft: () => draftStore.load(),
   clearDraft: () => draftStore.clear(),

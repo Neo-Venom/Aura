@@ -10,8 +10,8 @@ export function BreathingOrb({ size = 28, className, label }: { size?: number; c
       aria-label={label}
       data-testid="breathing-orb"
     >
-      <span className="absolute inset-0 rounded-full bg-butter/60 blur-[3px] animate-orb" />
-      <span className="absolute inset-[22%] rounded-full bg-apricot/80 animate-orb" style={{ animationDelay: '-0.4s' }} />
+      <span className="absolute inset-0 rounded-full blur-[3px] animate-orb" style={{ background: 'var(--orb-mini-halo)' }} />
+      <span className="absolute inset-[22%] rounded-full animate-orb" style={{ animationDelay: '-0.4s', background: 'var(--orb-mini-core)' }} />
     </span>
   );
 }

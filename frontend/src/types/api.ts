@@ -9,6 +9,8 @@ export interface Profile {
   accent: 'apricot' | 'sage' | 'lavender' | 'butter' | 'sky';
   theme_mode: 'light' | 'night' | 'system'; text_size: 'sm' | 'md' | 'lg';
   auto_send_voice: boolean; created_at: string;
+  // NOTE: addition beyond the original contract; BCP-47 tag for voice input, null = browser default.
+  stt_language?: string | null;
 }
 export interface QuestionItem {
   id: string; text: string; scale: 'frequency_week' | 'frequency_2wk'; section: 'main' | 'extra' | 'safety';

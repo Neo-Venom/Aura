@@ -73,7 +73,7 @@ export function BreathingTool({ compact }: { compact?: boolean }) {
         />
       </div>
       <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-        <div className="absolute inset-0 rounded-full bg-butter/30 blur-2xl" aria-hidden="true" />
+        <div className="absolute inset-0 rounded-full blur-2xl" style={{ background: 'var(--orb-halo)' }} aria-hidden="true" />
         <div
           aria-hidden="true"
           data-testid="breathing-orb-large"
@@ -81,8 +81,8 @@ export function BreathingTool({ compact }: { compact?: boolean }) {
           style={{
             transform: `scale(${started ? scale : 0.7})`,
             transition: `transform ${TICK}ms linear`,
-            background: 'radial-gradient(circle at 35% 30%, rgb(var(--c-butter)), rgb(var(--c-apricot) / 0.85) 55%, rgb(var(--c-lavender) / 0.8))',
-            boxShadow: '0 20px 60px -20px rgb(var(--c-apricot) / 0.6)',
+            background: 'var(--orb-gradient)',
+            boxShadow: 'var(--orb-glow)',
           }}
         />
         <p className="relative z-10 font-display text-2xl text-on-accent" aria-live="polite" data-testid="breathing-phase-text">
