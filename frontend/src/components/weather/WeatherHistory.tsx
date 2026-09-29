@@ -12,10 +12,10 @@ const MAX = 4;
 function SnapshotCard({ r, latest }: { r: AssessmentResult; latest: boolean }) {
   const heavy = r.dimensions.filter((d) => d.key !== 'brightness');
   const bright = r.dimensions.find((d) => d.key === 'brightness');
-  const date = new Date(r.created_at).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
+  const date = new Date(r.created_at).toLocaleDateString([], { day: 'numeric', month: 'short' });
   return (
     <li className={cn('min-w-0 rounded-4xl bg-surface p-4 shadow-soft', latest && 'ring-2 ring-lavender/70')} data-testid={`history-card-${r.id}`}>
-      <div className="flex items-center justify-between gap-2 px-1">
+      <div className="flex flex-wrap items-center justify-between gap-1 px-1">
         <time dateTime={r.created_at} className="text-sm font-bold">{date}</time>
         {latest && <span className="rounded-full bg-lavender/35 px-2.5 py-0.5 text-xs font-bold">{en.weather.latest}</span>}
       </div>

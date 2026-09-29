@@ -23,6 +23,9 @@ Build the FRONTEND ONLY of "Aura": free, warm AI emotional-support web app. Sign
 - Safety: SupportPill everywhere, CrisisModal/`/crisis` with country select, tel:/sms:, INTL fallback; `[test-high]`/`[test-imminent]` triggers (plus `[test-error]`, `[test-limit]`)
 - Settings: theme (light/night/system), accent picker, text size, auto-send, download JSON, delete chats, delete account (type DELETE)
 - README explains switching to real API
+- Weather History on /app/weather: up to 4 earlier check-ins side by side (mini radar + brightness word), `assessmentService.getHistory()` (http: GET /v1/assessment/history TODO)
+- Voice language setting (profile.stt_language, NOTE: field added to Profile contract) passed to sttService.start(cb, { lang })
+- Soft night polish: dusk blob palette (--blob-* tokens), warmer breathing-orb glow (--orb-* tokens)
 
 ## Backlog
 - P1: Real backend wiring by Antigravity (endpoints in TODO comments); Lighthouse a11y audit pass

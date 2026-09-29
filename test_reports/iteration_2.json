@@ -1,0 +1,37 @@
+{
+  "summary": "Iteration 2 verifies three new features: (1) Weather History on /app/weather, (2) Voice Language select in Settings, (3) Soft night polish (dimmer blobs + warmer orb glow). All required behaviours pass end-to-end via mock localStorage. Signed up new user, granted consent, injected 3 AssessmentResult objects into aura.mockdb.assessments[uid]. On /app/weather the [data-testid=weather-history] section renders exactly 3 SnapshotCards in grid order oldest→newest (Nov 1 2025 → Dec 15 2025 → Jan 5 2026), the rightmost card carries the 'Latest' badge, every card contains a [data-testid=weather-radar-mini] and a 'Brightness: <word>' line (rays / bright / shining), and the section text contains NO numeric percentages. Reducing the array to 1 item hides the section (count=0). The section is also absent from /onboarding/results (count=0). Settings > Voice: [data-testid=settings-voice-language-select] shows 'Same as my browser' as the first option (value=''), and includes 'हिन्दी (Hindi)' (hi-IN) and 'English (UK)' (en-GB). Selecting hi-IN persists — after full reload the select value is 'hi-IN' and aura.mockdb.users[uid].stt_language === 'hi-IN'. Soft night: clicking [data-testid=settings-theme-night] sets html[data-theme=night]; computed --blob-alpha=0.16 (vs 0.32 in light) and --orb-glow becomes the warmer dusk double-shadow ('0 0 90px 12px rgb(240 150 90/.28), 0 0 32px 4px rgb(255 196 140/.3)'). On /crisis (public page with BlobBackground) the alpha stays at 0.16 in night. On /app/calm the [data-testid=breathing-orb-large] computed box-shadow reflects the same warm dusk glow. Toggling back to light restores --blob-alpha=0.32 on landing (light regression fine). Regression: [data-testid=chat-mic-button] still rendered on /app/chat.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "verified_working": [
+    "weather-history section rendered with 3 cards in grid (sm:grid-cols-4), oldest on left, newest on right",
+    "'Latest' badge only on rightmost/newest card",
+    "Each history-card contains weather-radar-mini and 'Brightness: <word>' (rays/fairly bright/shining) with NO numeric %",
+    "Only 1 assessment → weather-history not rendered (count=0)",
+    "weather-history NOT rendered on /onboarding/results",
+    "settings-voice-language-select: first option 'Same as my browser' with value=''; includes hi-IN (हिन्दी) and en-GB",
+    "Voice language selection persists after reload; stored at profile.stt_language in aura.mockdb",
+    "Soft night theme sets html[data-theme=night]; --blob-alpha=0.16 (0.32 in light)",
+    "Night --orb-glow uses warmer dusk double-shadow; breathing-orb-large picks it up via var(--orb-glow)",
+    "Blobs still render on /crisis under night (data-testid=blob-background present) with dimmer alpha",
+    "Light theme regression OK: landing --blob-alpha=0.32; blob-background still present",
+    "chat-mic-button present on /app/chat"
+  ],
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "WeatherHistory shows up to 4 cards but the spec/copy says 'oldest left, newest right'. Current implementation does data.slice(0, MAX).reverse() where data is already newest-first (getHistory reverses). Correct behaviour observed with 3 items. If user ever has >4 assessments, only the 4 most recent are shown (oldest of those on left) — matches intent.",
+    "SnapshotCard renders WeatherRadar mini inside a <li>; consider adding an accessible label since date + brightness is the only text. Minor a11y polish, not blocking.",
+    "Iteration-1 open items still stand: 'Save & finish later' redirect loop (per prev report) and missing auth-password-toggle testid — not in scope this iteration."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (mock)", "frontend": "100%"},
+  "test_credentials": "history_test3@example.com / secret123 (mock signup)",
+  "seed_data_creation": "Injected 3 AssessmentResult objects directly into localStorage aura.mockdb.assessments[uid] and set users[uid].assessment_status='completed' to reach /app/weather without answering 29 questions.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "All three new features (weather history, voice language, soft night polish) verified working end-to-end. Injecting fake AssessmentResults into localStorage aura.mockdb is the fastest way to reach the history-populated state. Auth key is 'aura.session'; users live in aura.mockdb.users[uid]. Soft night dimmer blobs are controlled by CSS var --blob-alpha in tokens.css (0.32 light / 0.16 night); orb warm glow via --orb-glow."
+}
