@@ -1,5 +1,6 @@
 import { env } from '../lib/env';
 import { httpAuthService, type AuthService } from './auth';
+import { supabaseAuthService } from './supabase';
 import { httpProfileService, type ProfileService } from './profile';
 import { httpAssessmentService, type AssessmentService } from './assessment';
 import { httpChatService, type ChatService } from './chat';
@@ -24,9 +25,29 @@ let cached: Services | null = null;
 
 export function getServices(): Services {
   if (cached) return cached;
+  const auth = env.useMocks
+    ? mockAuthService
+    : env.supabaseUrl && env.supabaseAnonKey
+    ? supabaseAuthService
+    : httpAuthService;
+
   cached = env.useMocks
-    ? { authService: mockAuthService, profileService: mockProfileService, assessmentService: mockAssessmentService, chatService: mockChatService, safetyService: mockSafetyService, sttService: createSttService() }
-    : { authService: httpAuthService, profileService: httpProfileService, assessmentService: httpAssessmentService, chatService: httpChatService, safetyService: httpSafetyService, sttService: createSttService() };
+    ? {
+        authService: mockAuthService,
+        profileService: mockProfileService,
+        assessmentService: mockAssessmentService,
+        chatService: mockChatService,
+        safetyService: mockSafetyService,
+        sttService: createSttService(),
+      }
+    : {
+        authService: auth,
+        profileService: httpProfileService,
+        assessmentService: httpAssessmentService,
+        chatService: httpChatService,
+        safetyService: httpSafetyService,
+        sttService: createSttService(),
+      };
   return cached;
 }
 

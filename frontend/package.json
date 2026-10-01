@@ -31,10 +31,12 @@
     "@radix-ui/react-toggle": "1.1.6",
     "@radix-ui/react-toggle-group": "1.1.7",
     "@radix-ui/react-tooltip": "1.2.4",
+    "@supabase/supabase-js": "^2.117.2",
     "@tanstack/react-query": "5.56.2",
     "@types/node": "20",
     "@types/react": "19",
     "@types/react-dom": "19",
+    "@vercel/analytics": "^2.0.1",
     "ajv": "^8.17.1",
     "axios": "1.18.0",
     "class-variance-authority": "0.7.1",
@@ -145,9 +147,6 @@
     "**/jest-util/picomatch": "2.3.2",
     "tinyglobby/picomatch": "4.0.4",
     "http-proxy-middleware": "2.0.10"
-  },
-  "overrides": {
-    "ajv": "8.17.1"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
