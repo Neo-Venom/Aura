@@ -14,6 +14,7 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 import httpx
+import sqlite3
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -119,13 +120,179 @@ class AIKeyRotator:
 ai_rotator = AIKeyRotator()
 
 # ---------------------------------------------------------
-# In-Memory & Resilient Storage (works without requiring local MongoDB daemon)
+# SQLite Database Persistence Layer (persists across workers and restarts)
 # ---------------------------------------------------------
-users_db: Dict[str, Dict[str, Any]] = {}
-sessions_db: Dict[str, Dict[str, Any]] = {}  # session_id -> session
-messages_db: Dict[str, List[Dict[str, Any]]] = {}  # session_id -> messages
-assessments_db: Dict[str, List[Dict[str, Any]]] = {}  # user_id -> assessments
-tokens_db: Dict[str, str] = {}  # token -> user_id
+DB_PATH = ROOT_DIR / "aura.db"
+
+def get_db():
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False, timeout=30.0)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    with get_db() as conn:
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                email TEXT,
+                display_name TEXT,
+                country_code TEXT,
+                consent_given INTEGER,
+                assessment_status TEXT,
+                accent TEXT,
+                theme_mode TEXT,
+                text_size TEXT,
+                auto_send_voice INTEGER,
+                created_at TEXT,
+                stt_language TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                title TEXT,
+                last_message_at TEXT,
+                created_at TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id TEXT PRIMARY KEY,
+                session_id TEXT,
+                role TEXT,
+                content TEXT,
+                input_mode TEXT,
+                safety_level TEXT,
+                created_at TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS assessments (
+                id TEXT PRIMARY KEY,
+                user_id TEXT,
+                created_at TEXT,
+                dimensions TEXT,
+                show_support_card INTEGER
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS tokens (
+                token TEXT PRIMARY KEY,
+                user_id TEXT
+            )
+        """)
+        conn.commit()
+
+init_db()
+
+def db_save_user(u: Dict[str, Any]):
+    with get_db() as conn:
+        conn.execute("""
+            INSERT OR REPLACE INTO users (id, email, display_name, country_code, consent_given, assessment_status, accent, theme_mode, text_size, auto_send_voice, created_at, stt_language)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            u.get("id"), u.get("email"), u.get("display_name"), u.get("country_code", "US"),
+            1 if u.get("consent_given") else 0, u.get("assessment_status", "not_started"),
+            u.get("accent", "apricot"), u.get("theme_mode", "light"), u.get("text_size", "md"),
+            1 if u.get("auto_send_voice") else 0, u.get("created_at"), u.get("stt_language")
+        ))
+        conn.commit()
+
+def db_get_user(uid: str) -> Optional[Dict[str, Any]]:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        d["consent_given"] = bool(d["consent_given"])
+        d["auto_send_voice"] = bool(d["auto_send_voice"])
+        return d
+
+def db_save_session(s: Dict[str, Any]):
+    with get_db() as conn:
+        conn.execute("""
+            INSERT OR REPLACE INTO sessions (id, user_id, title, last_message_at, created_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (s.get("id"), s.get("user_id"), s.get("title"), s.get("last_message_at"), s.get("created_at")))
+        conn.commit()
+
+def db_get_session(sid: str) -> Optional[Dict[str, Any]]:
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM sessions WHERE id = ?", (sid,)).fetchone()
+        return dict(row) if row else None
+
+def db_get_user_sessions(uid: str, q: Optional[str] = None) -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        if q:
+            rows = conn.execute("SELECT * FROM sessions WHERE user_id = ? AND title LIKE ? ORDER BY last_message_at DESC", (uid, f"%{q}%")).fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM sessions WHERE user_id = ? ORDER BY last_message_at DESC", (uid,)).fetchall()
+        return [dict(r) for r in rows]
+
+def db_delete_session(sid: str):
+    with get_db() as conn:
+        conn.execute("DELETE FROM sessions WHERE id = ?", (sid,))
+        conn.execute("DELETE FROM messages WHERE session_id = ?", (sid,))
+        conn.commit()
+
+def db_delete_all_sessions(uid: str):
+    with get_db() as conn:
+        rows = conn.execute("SELECT id FROM sessions WHERE user_id = ?", (uid,)).fetchall()
+        sids = [r["id"] for r in rows]
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (uid,))
+        for sid in sids:
+            conn.execute("DELETE FROM messages WHERE session_id = ?", (sid,))
+        conn.commit()
+
+def db_save_message(m: Dict[str, Any]):
+    with get_db() as conn:
+        conn.execute("""
+            INSERT OR REPLACE INTO messages (id, session_id, role, content, input_mode, safety_level, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (m.get("id"), m.get("session_id"), m.get("role"), m.get("content"), m.get("input_mode", "text"), m.get("safety_level", "none"), m.get("created_at")))
+        conn.commit()
+
+def db_get_messages(sid: str) -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC", (sid,)).fetchall()
+        return [dict(r) for r in rows]
+
+def db_save_assessment(a: Dict[str, Any]):
+    with get_db() as conn:
+        dims_json = json.dumps(a.get("dimensions", []))
+        conn.execute("""
+            INSERT OR REPLACE INTO assessments (id, user_id, created_at, dimensions, show_support_card)
+            VALUES (?, ?, ?, ?, ?)
+        """, (a.get("id"), a.get("user_id"), a.get("created_at"), dims_json, 1 if a.get("show_support_card") else 0))
+        conn.commit()
+
+def db_get_assessments(uid: str) -> List[Dict[str, Any]]:
+    with get_db() as conn:
+        rows = conn.execute("SELECT * FROM assessments WHERE user_id = ? ORDER BY created_at ASC", (uid,)).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["dimensions"] = json.loads(d.get("dimensions") or "[]")
+            d["show_support_card"] = bool(d["show_support_card"])
+            result.append(d)
+        return result
+
+def db_save_token(token: str, uid: str):
+    with get_db() as conn:
+        conn.execute("INSERT OR REPLACE INTO tokens (token, user_id) VALUES (?, ?)", (token, uid))
+        conn.commit()
+
+def db_get_token_user(token: str) -> Optional[str]:
+    with get_db() as conn:
+        row = conn.execute("SELECT user_id FROM tokens WHERE token = ?", (token,)).fetchone()
+        return row["user_id"] if row else None
+
+def db_delete_token(token: str):
+    with get_db() as conn:
+        conn.execute("DELETE FROM tokens WHERE token = ?", (token,))
+        conn.commit()
 
 # ---------------------------------------------------------
 # Seed Data: Questionnaire & Crisis Resources
@@ -302,8 +469,8 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> st
         return "preview_user_id"
     token = authorization.split("Bearer ")[1].strip()
     
-    # Check tokens_db first (for local server tokens)
-    user_id = tokens_db.get(token)
+    # Check tokens database first (for local server tokens)
+    user_id = db_get_token_user(token)
     if user_id:
         return user_id
 
@@ -314,18 +481,24 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> st
         sup_email = claims.get("email", f"{sup_uid[:8]}@user.aura")
         user_obj = ensure_user(sup_uid, email=sup_email)
         meta = claims.get("user_metadata", {})
+        dirty = False
         if meta.get("display_name") and not user_obj.get("display_name"):
             user_obj["display_name"] = meta["display_name"]
+            dirty = True
         if meta.get("country_code") and user_obj.get("country_code") == "US":
             user_obj["country_code"] = meta["country_code"]
+            dirty = True
+        if dirty:
+            db_save_user(user_obj)
         return sup_uid
 
     return "preview_user_id"
 
 def ensure_user(user_id: str, email: str = "guest@example.com") -> Dict[str, Any]:
-    if user_id not in users_db:
+    u = db_get_user(user_id)
+    if not u:
         now_str = datetime.now(timezone.utc).isoformat()
-        users_db[user_id] = {
+        u = {
             "id": user_id,
             "email": email,
             "display_name": None,
@@ -339,7 +512,8 @@ def ensure_user(user_id: str, email: str = "guest@example.com") -> Dict[str, Any
             "created_at": now_str,
             "stt_language": None,
         }
-    return users_db[user_id]
+        db_save_user(u)
+    return u
 
 # ---------------------------------------------------------
 # API Routes: /v1
@@ -351,9 +525,9 @@ v1_router = APIRouter(prefix="/v1")
 async def signup(input: SignUpInput):
     uid = str(uuid.uuid4())
     token = f"aura_token_{uuid.uuid4().hex}"
-    tokens_db[token] = uid
+    db_save_token(token, uid)
     now_str = datetime.now(timezone.utc).isoformat()
-    users_db[uid] = {
+    u = {
         "id": uid,
         "email": input.email,
         "display_name": input.display_name,
@@ -367,15 +541,17 @@ async def signup(input: SignUpInput):
         "created_at": now_str,
         "stt_language": None,
     }
+    db_save_user(u)
     return AuthSession(token=token, user_id=uid, email=input.email)
 
 @v1_router.post("/auth/login", response_model=AuthSession)
 async def login(input: LoginInput):
-    for uid, u in users_db.items():
-        if u["email"].lower() == input.email.lower():
+    with get_db() as conn:
+        row = conn.execute("SELECT * FROM users WHERE LOWER(email) = LOWER(?)", (input.email,)).fetchone()
+        if row:
             token = f"aura_token_{uuid.uuid4().hex}"
-            tokens_db[token] = uid
-            return AuthSession(token=token, user_id=uid, email=u["email"])
+            db_save_token(token, row["id"])
+            return AuthSession(token=token, user_id=row["id"], email=row["email"])
     # If not found, create new session for demo convenience
     return await signup(SignUpInput(email=input.email, password=input.password))
 
@@ -383,7 +559,7 @@ async def login(input: LoginInput):
 async def google_login():
     uid = str(uuid.uuid4())
     token = f"aura_token_{uuid.uuid4().hex}"
-    tokens_db[token] = uid
+    db_save_token(token, uid)
     email = f"google_user_{uid[:6]}@example.com"
     ensure_user(uid, email=email)
     return AuthSession(token=token, user_id=uid, email=email)
@@ -392,7 +568,7 @@ async def google_login():
 async def logout(authorization: Optional[str] = Header(None)):
     if authorization and authorization.startswith("Bearer "):
         token = authorization.split("Bearer ")[1].strip()
-        tokens_db.pop(token, None)
+        db_delete_token(token)
     return {"ok": True}
 
 # --- PROFILE & ME ---
@@ -406,18 +582,23 @@ async def update_me(patch: ProfilePatch, user_id: str = Depends(get_current_user
     u = ensure_user(user_id)
     patch_data = patch.model_dump(exclude_unset=True)
     u.update(patch_data)
+    db_save_user(u)
     return Profile(**u)
 
 @v1_router.post("/me/consent", response_model=Profile)
 async def give_consent(user_id: str = Depends(get_current_user_id)):
     u = ensure_user(user_id)
     u["consent_given"] = True
+    db_save_user(u)
     return Profile(**u)
 
 @v1_router.delete("/me")
 async def delete_account(user_id: str = Depends(get_current_user_id)):
-    users_db.pop(user_id, None)
-    assessments_db.pop(user_id, None)
+    with get_db() as conn:
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        conn.execute("DELETE FROM assessments WHERE user_id = ?", (user_id,))
+        conn.commit()
+    db_delete_all_sessions(user_id)
     return {"ok": True}
 
 @v1_router.get("/me/export")
@@ -426,7 +607,7 @@ async def export_data(user_id: str = Depends(get_current_user_id)):
     return {
         "exported_at": datetime.now(timezone.utc).isoformat(),
         "profile": u,
-        "check_ins": assessments_db.get(user_id, []),
+        "check_ins": db_get_assessments(user_id),
     }
 
 # --- ASSESSMENT & WEATHER HISTORY ---
@@ -468,7 +649,7 @@ async def get_questionnaire():
 
 @v1_router.post("/assessment/submit", response_model=AssessmentResult)
 async def submit_assessment(input: AssessmentSubmitInput, user_id: str = Depends(get_current_user_id)):
-    ensure_user(user_id)
+    u = ensure_user(user_id)
     safe_val = next((a.value for a in input.answers if a.item_id == "safe_01"), 0) or 0
     dimensions = calculate_dass_score(input.answers)
     result = AssessmentResult(
@@ -477,10 +658,15 @@ async def submit_assessment(input: AssessmentSubmitInput, user_id: str = Depends
         dimensions=dimensions,
         show_support_card=(safe_val > 0)
     )
-    if user_id not in assessments_db:
-        assessments_db[user_id] = []
-    assessments_db[user_id].append(result.model_dump())
-    users_db[user_id]["assessment_status"] = "completed"
+    db_save_assessment({
+        "id": result.id,
+        "user_id": user_id,
+        "created_at": result.created_at,
+        "dimensions": [d.model_dump() for d in dimensions],
+        "show_support_card": result.show_support_card,
+    })
+    u["assessment_status"] = "completed"
+    db_save_user(u)
     return result
 
 @v1_router.post("/assessment/skip")
@@ -488,11 +674,12 @@ async def skip_assessment(user_id: str = Depends(get_current_user_id)):
     u = ensure_user(user_id)
     if u["assessment_status"] != "completed":
         u["assessment_status"] = "skipped"
+        db_save_user(u)
     return {"ok": True}
 
 @v1_router.get("/assessment/latest", response_model=Optional[AssessmentResult])
 async def get_latest_assessment(user_id: str = Depends(get_current_user_id)):
-    history = assessments_db.get(user_id, [])
+    history = db_get_assessments(user_id)
     if not history:
         return None
     return AssessmentResult(**history[-1])
@@ -501,17 +688,14 @@ async def get_latest_assessment(user_id: str = Depends(get_current_user_id)):
 @v1_router.get("/assessment/history", response_model=List[AssessmentResult])
 async def get_assessment_history(user_id: str = Depends(get_current_user_id)):
     """Returns assessment snapshots, newest first."""
-    history = assessments_db.get(user_id, [])
+    history = db_get_assessments(user_id)
     # Return newest first (reversed)
     return [AssessmentResult(**item) for item in reversed(history)]
 
 # --- CHAT SESSIONS & STREAMING WITH RATE LIMITING & KEY ROTATION ---
 @v1_router.get("/chat/sessions")
 async def list_sessions(user_id: str = Depends(get_current_user_id), q: Optional[str] = None):
-    user_sessions = [s for s in sessions_db.values() if s.get("user_id") == user_id]
-    if q:
-        user_sessions = [s for s in user_sessions if q.lower() in s.get("title", "").lower()]
-    user_sessions.sort(key=lambda s: s.get("last_message_at", ""), reverse=True)
+    user_sessions = db_get_user_sessions(user_id, q)
     return {"items": user_sessions, "next_cursor": None}
 
 @v1_router.post("/chat/sessions", response_model=ChatSession)
@@ -525,41 +709,36 @@ async def create_session(user_id: str = Depends(get_current_user_id)):
         "last_message_at": now_str,
         "created_at": now_str,
     }
-    sessions_db[sid] = session
-    messages_db[sid] = []
+    db_save_session(session)
     return ChatSession(**session)
 
 @v1_router.get("/chat/sessions/{session_id}", response_model=SessionDetail)
 async def get_session(session_id: str, user_id: str = Depends(get_current_user_id)):
-    session = sessions_db.get(session_id)
+    session = db_get_session(session_id)
     if not session:
         now_str = datetime.now(timezone.utc).isoformat()
         session = {"id": session_id, "user_id": user_id, "title": "Quiet moment", "last_message_at": now_str, "created_at": now_str}
-        sessions_db[session_id] = session
-        messages_db[session_id] = []
-    messages = messages_db.get(session_id, [])
+        db_save_session(session)
+    messages = db_get_messages(session_id)
     return SessionDetail(session=ChatSession(**session), messages=messages)
 
 @v1_router.patch("/chat/sessions/{session_id}", response_model=ChatSession)
 async def rename_session(session_id: str, input: RenameSessionInput):
-    session = sessions_db.get(session_id)
+    session = db_get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     session["title"] = input.title
+    db_save_session(session)
     return ChatSession(**session)
 
 @v1_router.delete("/chat/sessions/{session_id}")
 async def delete_session(session_id: str):
-    sessions_db.pop(session_id, None)
-    messages_db.pop(session_id, None)
+    db_delete_session(session_id)
     return {"ok": True}
 
 @v1_router.delete("/chat/sessions")
 async def delete_all_sessions(user_id: str = Depends(get_current_user_id)):
-    to_delete = [sid for sid, s in sessions_db.items() if s.get("user_id") == user_id]
-    for sid in to_delete:
-        sessions_db.pop(sid, None)
-        messages_db.pop(sid, None)
+    db_delete_all_sessions(user_id)
     return {"ok": True}
 
 # Therapeutic Warm Streaming Generator with Multi-Key Circular Failover
@@ -582,8 +761,8 @@ async def stream_chat_response(session_id: str, user_id: str, user_msg: str, use
     if is_crisis:
         yield f"data: {json.dumps({'type': 'safety', 'level': 'high', 'show_crisis_card': True})}\n\n"
 
-    # 4. Build conversational history from messages_db
-    history = messages_db.get(session_id, [])
+    # 4. Build conversational history from SQLite messages
+    history = db_get_messages(session_id)
     recent_history = [m for m in history if m.get("id") != user_msg_id][-8:]
 
     reply_generated = False
@@ -713,10 +892,8 @@ async def stream_chat_response(session_id: str, user_id: str, user_msg: str, use
             yield f"data: {json.dumps({'type': 'token', 'delta': delta})}\n\n"
             await asyncio.sleep(0.04)
 
-    # 8. Save assistant reply to memory/database
-    if session_id not in messages_db:
-        messages_db[session_id] = []
-    messages_db[session_id].append({
+    # 8. Save assistant reply to SQLite
+    db_save_message({
         "id": asst_msg_id,
         "session_id": session_id,
         "role": "assistant",
@@ -735,10 +912,12 @@ async def stream_chat_response(session_id: str, user_id: str, user_msg: str, use
     else:
         title = "Quiet moment"
 
-    if session_id in sessions_db:
-        sessions_db[session_id]["last_message_at"] = datetime.now(timezone.utc).isoformat()
-        if sessions_db[session_id].get("title") in ["Quiet moment", "New Chat", ""]:
-            sessions_db[session_id]["title"] = title
+    sess = db_get_session(session_id)
+    if sess:
+        sess["last_message_at"] = datetime.now(timezone.utc).isoformat()
+        if sess.get("title") in ["Quiet moment", "New Chat", ""]:
+            sess["title"] = title
+        db_save_session(sess)
 
     yield f"data: {json.dumps({'type': 'title', 'title': title})}\n\n"
     yield f"data: {json.dumps({'type': 'done', 'finish_reason': 'stop'})}\n\n"
@@ -747,9 +926,16 @@ async def stream_chat_response(session_id: str, user_id: str, user_msg: str, use
 async def send_message(session_id: str, input: SendMessageInput, request: Request, user_id: str = Depends(get_current_user_id)):
     user_msg_id = input.client_message_id or str(uuid.uuid4())
     now_str = datetime.now(timezone.utc).isoformat()
-    if session_id not in messages_db:
-        messages_db[session_id] = []
-    messages_db[session_id].append({
+    sess = db_get_session(session_id)
+    if not sess:
+        db_save_session({
+            "id": session_id,
+            "user_id": user_id,
+            "title": "Quiet moment",
+            "last_message_at": now_str,
+            "created_at": now_str,
+        })
+    db_save_message({
         "id": user_msg_id,
         "session_id": session_id,
         "role": "user",

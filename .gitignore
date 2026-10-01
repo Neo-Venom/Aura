@@ -96,3 +96,8 @@ frontend/node_modules/.cache/default-development/0.pack
 frontend/node_modules/.cache/default-development/1.pack
 frontend/node_modules/.cache/default-development/4.pack
 backend/.env
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite*
