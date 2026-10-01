@@ -8,6 +8,7 @@ import json
 import uuid
 import logging
 import asyncio
+import base64
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
@@ -273,15 +274,45 @@ class SendMessageInput(BaseModel):
 # ---------------------------------------------------------
 # Helper Dependencies
 # ---------------------------------------------------------
+def extract_jwt_claims(token: str) -> Optional[Dict[str, Any]]:
+    try:
+        parts = token.split(".")
+        if len(parts) == 3:
+            payload_b64 = parts[1]
+            rem = len(payload_b64) % 4
+            if rem > 0:
+                payload_b64 += "=" * (4 - rem)
+            decoded = base64.urlsafe_b64decode(payload_b64).decode("utf-8")
+            return json.loads(decoded)
+    except Exception:
+        pass
+    return None
+
 async def get_current_user_id(authorization: Optional[str] = Header(None)) -> str:
     if not authorization or not authorization.startswith("Bearer "):
         # For ease in preview, fall back to guest user if no header
         return "preview_user_id"
     token = authorization.split("Bearer ")[1].strip()
+    
+    # Check tokens_db first (for local server tokens)
     user_id = tokens_db.get(token)
-    if not user_id:
-        return "preview_user_id"
-    return user_id
+    if user_id:
+        return user_id
+
+    # If it is a Supabase JWT, decode claims to identify user
+    claims = extract_jwt_claims(token)
+    if claims and "sub" in claims:
+        sup_uid = claims["sub"]
+        sup_email = claims.get("email", f"{sup_uid[:8]}@user.aura")
+        user_obj = ensure_user(sup_uid, email=sup_email)
+        meta = claims.get("user_metadata", {})
+        if meta.get("display_name") and not user_obj.get("display_name"):
+            user_obj["display_name"] = meta["display_name"]
+        if meta.get("country_code") and user_obj.get("country_code") == "US":
+            user_obj["country_code"] = meta["country_code"]
+        return sup_uid
+
+    return "preview_user_id"
 
 def ensure_user(user_id: str, email: str = "guest@example.com") -> Dict[str, Any]:
     if user_id not in users_db:

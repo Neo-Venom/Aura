@@ -32,8 +32,14 @@ export const supabaseAuthService: AuthService = {
       },
     });
     if (error) throw new Error(error.message);
+    if (!data.session) {
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        throw new Error('An account with this email already exists. Please log in instead.');
+      }
+      throw new Error('Confirmation email sent! Please check your email to confirm your account, or disable "Confirm email" in Supabase Dashboard.');
+    }
     const session: AuthSession = {
-      token: data.session?.access_token || 'anon_token',
+      token: data.session.access_token,
       user_id: data.user?.id || '',
       email: data.user?.email || input.email,
     };

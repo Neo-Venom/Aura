@@ -30,7 +30,8 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
   const [show, setShow] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
 
   const errors = {
     email: EMAIL_RE.test(email.trim()) ? undefined : en.auth.badEmail,
@@ -45,12 +46,28 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
     setTouched({ email: true, password: true, country: true });
     if (errors.email || errors.password || errors.country) return;
     setBusy(true);
-    setFailed(false);
+    setErrorMessage(null);
+    setInfoMessage(null);
     try {
-      if (signup) await authService.signUp({ email: email.trim(), password, display_name: name.trim() || null, country_code: country });
-      else await authService.logIn(email.trim(), password);
-    } catch {
-      setFailed(true);
+      if (signup) {
+        await authService.signUp({ email: email.trim(), password, display_name: name.trim() || null, country_code: country });
+      } else {
+        await authService.logIn(email.trim(), password);
+      }
+    } catch (err: any) {
+      const msg = err?.message || '';
+      const lower = msg.toLowerCase();
+      if (lower.includes('rate limit') || lower.includes('over_email_send_rate_limit')) {
+        setErrorMessage("Supabase email rate limit reached (3/hr limit). Please disable 'Confirm email' in your Supabase Dashboard (Authentication > Providers > Email) so signups don't require emails, or try again later.");
+      } else if (lower.includes('invalid login credentials')) {
+        setErrorMessage("Invalid email or password. If you haven't created an account yet, please click 'Create an account' below.");
+      } else if (lower.includes('already registered') || lower.includes('already exists')) {
+        setErrorMessage("An account with this email already exists. Please log in instead.");
+      } else if (lower.includes('check your email') || lower.includes('confirmation email')) {
+        setInfoMessage(msg);
+      } else {
+        setErrorMessage(msg || en.auth.failed);
+      }
       setBusy(false);
     }
   };
@@ -88,7 +105,16 @@ export function AuthForm({ mode }: { mode: 'login' | 'signup' }) {
           <p className="px-2 text-xs text-muted">{en.auth.countryHint}</p>
         </Field>
       )}
-      {failed && <p role="alert" className="rounded-2xl bg-butter/40 px-4 py-3 text-sm font-semibold" data-testid="auth-error">{en.auth.failed}</p>}
+      {errorMessage && (
+        <div role="alert" className="rounded-2xl border border-accent-strong/20 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent-strong leading-relaxed" data-testid="auth-error">
+          {errorMessage}
+        </div>
+      )}
+      {infoMessage && (
+        <div role="status" className="rounded-2xl border border-sage/30 bg-sage/15 px-4 py-3 text-sm font-semibold text-ink leading-relaxed" data-testid="auth-info">
+          {infoMessage}
+        </div>
+      )}
       <Button type="submit" size="lg" className="w-full" disabled={busy} data-testid="auth-submit-button">
         {signup ? en.auth.signup : en.auth.login}
       </Button>
