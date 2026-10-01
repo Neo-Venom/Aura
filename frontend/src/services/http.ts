@@ -25,9 +25,10 @@ export async function apiFetchRaw(path: string, init: RequestInit = {}): Promise
   }
   const t = token();
   if (t) headers.set('Authorization', `Bearer ${t}`);
+  const baseUrl = env.apiBaseUrl.replace(/\/+$/, '');
   let res: Response;
   try {
-    res = await fetch(`${env.apiBaseUrl}${path}`, { ...init, headers });
+    res = await fetch(`${baseUrl}${path}`, { ...init, headers });
   } catch {
     throw new ApiError('network', 'Network unavailable');
   }
