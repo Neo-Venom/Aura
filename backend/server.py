@@ -92,21 +92,29 @@ class AIKeyRotator:
         self.groq_index = 0
         self.lock = asyncio.Lock()
 
-    async def get_next_gemini_key(self) -> Optional[str]:
+    async def get_ordered_gemini_keys(self) -> List[str]:
         async with self.lock:
             if not self.gemini_keys:
-                return None
-            key = self.gemini_keys[self.gemini_index % len(self.gemini_keys)]
+                return []
+            keys = [self.gemini_keys[(self.gemini_index + i) % len(self.gemini_keys)] for i in range(len(self.gemini_keys))]
             self.gemini_index = (self.gemini_index + 1) % len(self.gemini_keys)
-            return key
+            return keys
 
-    async def get_next_groq_key(self) -> Optional[str]:
+    async def get_ordered_groq_keys(self) -> List[str]:
         async with self.lock:
             if not self.groq_keys:
-                return None
-            key = self.groq_keys[self.groq_index % len(self.groq_keys)]
+                return []
+            keys = [self.groq_keys[(self.groq_index + i) % len(self.groq_keys)] for i in range(len(self.groq_keys))]
             self.groq_index = (self.groq_index + 1) % len(self.groq_keys)
-            return key
+            return keys
+
+    async def get_next_gemini_key(self) -> Optional[str]:
+        keys = await self.get_ordered_gemini_keys()
+        return keys[0] if keys else None
+
+    async def get_next_groq_key(self) -> Optional[str]:
+        keys = await self.get_ordered_groq_keys()
+        return keys[0] if keys else None
 
 ai_rotator = AIKeyRotator()
 
@@ -574,61 +582,120 @@ async def stream_chat_response(session_id: str, user_id: str, user_msg: str, use
     if is_crisis:
         yield f"data: {json.dumps({'type': 'safety', 'level': 'high', 'show_crisis_card': True})}\n\n"
 
-    # 4. Attempt AI inference using Circular Key Rotator (Gemini -> Groq -> Warm Fallback)
+    # 4. Build conversational history from messages_db
+    history = messages_db.get(session_id, [])
+    recent_history = [m for m in history if m.get("id") != user_msg_id][-8:]
+
     reply_generated = False
+    full_reply = ""
 
-    # Try Gemini Key Circular Loop
-    gemini_key = await ai_rotator.get_next_gemini_key()
-    if gemini_key:
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
-                payload = {
-                    "contents": [{"parts": [{"text": f"You are Aura, a gentle, compassionate emotional support companion. Speak in warm, concise, conversational sentences without diagnosing or giving medical advice. Be validating, calm, and grounded.\nUser: {user_msg}"}]}],
-                    "generationConfig": {"temperature": 0.7, "maxOutputTokens": 300}
-                }
-                res = await client.post(url, json=payload)
-                if res.status_code == 200:
-                    data = res.json()
-                    text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                    if text:
-                        words = text.split(" ")
-                        for w in words:
-                            yield f"data: {json.dumps({'type': 'token', 'delta': w + ' '})}\n\n"
-                            await asyncio.sleep(0.03)
-                        reply_generated = True
-        except Exception as e:
-            logger.warning(f"Gemini generation error: {e}, falling back...")
+    # 5. Try Gemini Key Circular Loop
+    gemini_keys = await ai_rotator.get_ordered_gemini_keys()
+    gemini_models = ["gemini-2.5-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"]
 
-    # Try Groq Key Circular Loop if Gemini didn't complete
-    if not reply_generated:
-        groq_key = await ai_rotator.get_next_groq_key()
-        if groq_key:
+    for g_key in gemini_keys:
+        if reply_generated:
+            break
+        for model in gemini_models:
+            if reply_generated:
+                break
             try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={g_key}"
+                contents = []
+                for m in recent_history:
+                    role = "user" if m.get("role") == "user" else "model"
+                    contents.append({"role": role, "parts": [{"text": m.get("content", "")}]})
+                contents.append({"role": "user", "parts": [{"text": user_msg}]})
+
+                payload = {
+                    "system_instruction": {
+                        "parts": [{
+                            "text": (
+                                "You are Aura, a gentle, compassionate emotional support companion. "
+                                "Speak in warm, concise, conversational sentences without diagnosing or giving clinical medical advice. "
+                                "Be validating, calm, and grounded."
+                            )
+                        }]
+                    },
+                    "contents": contents,
+                    "generationConfig": {
+                        "temperature": 0.7,
+                        "maxOutputTokens": 350
+                    }
+                }
                 async with httpx.AsyncClient(timeout=15.0) as client:
+                    res = await client.post(url, json=payload)
+                    if res.status_code == 200:
+                        data = res.json()
+                        text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                        if text:
+                            words = text.split(" ")
+                            for w in words:
+                                delta = w + " "
+                                full_reply += delta
+                                yield f"data: {json.dumps({'type': 'token', 'delta': delta})}\n\n"
+                                await asyncio.sleep(0.02)
+                            reply_generated = True
+                            break
+                    else:
+                        logger.warning(f"Gemini {model} returned HTTP {res.status_code}: {res.text[:200]}")
+            except Exception as e:
+                logger.warning(f"Gemini {model} error: {e}")
+
+    # 6. Try Groq Key Circular Loop if Gemini failed
+    if not reply_generated:
+        groq_keys = await ai_rotator.get_ordered_groq_keys()
+        groq_models = ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"]
+
+        for gr_key in groq_keys:
+            if reply_generated:
+                break
+            for model in groq_models:
+                if reply_generated:
+                    break
+                try:
                     url = "https://api.groq.com/openai/v1/chat/completions"
-                    headers = {"Authorization": f"Bearer {groq_key}"}
+                    headers = {"Authorization": f"Bearer {gr_key}"}
+                    groq_msgs = [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are Aura, a warm, compassionate emotional support companion. "
+                                "Keep answers gentle, calm, grounding, and concise. Do not give clinical diagnosis."
+                            )
+                        }
+                    ]
+                    for m in recent_history:
+                        role = "user" if m.get("role") == "user" else "assistant"
+                        groq_msgs.append({"role": role, "content": m.get("content", "")})
+                    groq_msgs.append({"role": "user", "content": user_msg})
+
                     payload = {
-                        "model": "llama-3.3-70b-versatile",
-                        "messages": [
-                            {"role": "system", "content": "You are Aura, a warm, compassionate emotional support companion. Keep answers gentle, calm, grounding, and concise."},
-                            {"role": "user", "content": user_msg}
-                        ],
+                        "model": model,
+                        "messages": groq_msgs,
                         "temperature": 0.7,
                         "max_tokens": 250
                     }
-                    res = await client.post(url, json=payload, headers=headers)
-                    if res.status_code == 200:
-                        text = res.json()["choices"][0]["message"]["content"]
-                        words = text.split(" ")
-                        for w in words:
-                            yield f"data: {json.dumps({'type': 'token', 'delta': w + ' '})}\n\n"
-                            await asyncio.sleep(0.03)
-                        reply_generated = True
-            except Exception as e:
-                logger.warning(f"Groq generation error: {e}, using warm fallback...")
+                    async with httpx.AsyncClient(timeout=15.0) as client:
+                        res = await client.post(url, json=payload, headers=headers)
+                        if res.status_code == 200:
+                            data = res.json()
+                            text = data["choices"][0]["message"]["content"]
+                            if text:
+                                words = text.split(" ")
+                                for w in words:
+                                    delta = w + " "
+                                    full_reply += delta
+                                    yield f"data: {json.dumps({'type': 'token', 'delta': delta})}\n\n"
+                                    await asyncio.sleep(0.02)
+                                reply_generated = True
+                                break
+                        else:
+                            logger.warning(f"Groq {model} returned HTTP {res.status_code}: {res.text[:200]}")
+                except Exception as e:
+                    logger.warning(f"Groq {model} error: {e}")
 
-    # Warm Therapeutic Default Streaming Fallback (Preview Mode)
+    # 7. Warm Therapeutic Default Streaming Fallback (Only if all external API calls failed)
     if not reply_generated:
         fallback_replies = [
             "Thank you for telling me. That sounds like a lot to hold at once. What feels heaviest right now?",
@@ -641,12 +708,39 @@ async def stream_chat_response(session_id: str, user_id: str, user_msg: str, use
         text = random.choice(fallback_replies)
         words = text.split(" ")
         for w in words:
-            yield f"data: {json.dumps({'type': 'token', 'delta': w + ' '})}\n\n"
+            delta = w + " "
+            full_reply += delta
+            yield f"data: {json.dumps({'type': 'token', 'delta': delta})}\n\n"
             await asyncio.sleep(0.04)
 
-    # 5. Emit title if first message
-    yield f"data: {json.dumps({'type': 'title', 'title': 'Quiet moment'})}\n\n"
-    # 6. Emit done
+    # 8. Save assistant reply to memory/database
+    if session_id not in messages_db:
+        messages_db[session_id] = []
+    messages_db[session_id].append({
+        "id": asst_msg_id,
+        "session_id": session_id,
+        "role": "assistant",
+        "content": full_reply.strip(),
+        "input_mode": "text",
+        "safety_level": "high" if is_crisis else "none",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+    # 9. Update session title & timestamp
+    clean_user = user_msg.strip()
+    words = clean_user.split()
+    title = " ".join(words[:4]) if len(words) >= 4 else clean_user[:25]
+    if title:
+        title = title[0].upper() + title[1:]
+    else:
+        title = "Quiet moment"
+
+    if session_id in sessions_db:
+        sessions_db[session_id]["last_message_at"] = datetime.now(timezone.utc).isoformat()
+        if sessions_db[session_id].get("title") in ["Quiet moment", "New Chat", ""]:
+            sessions_db[session_id]["title"] = title
+
+    yield f"data: {json.dumps({'type': 'title', 'title': title})}\n\n"
     yield f"data: {json.dumps({'type': 'done', 'finish_reason': 'stop'})}\n\n"
 
 @v1_router.post("/chat/sessions/{session_id}/messages")
@@ -683,4 +777,10 @@ app.include_router(v1_router)
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "app": "Aura Backend API", "version": "1.0.0"}
+    return {
+        "status": "ok",
+        "app": "Aura Backend API",
+        "version": "1.0.0",
+        "gemini_keys_configured": len(ai_rotator.gemini_keys),
+        "groq_keys_configured": len(ai_rotator.groq_keys)
+    }
