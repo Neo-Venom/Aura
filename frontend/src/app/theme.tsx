@@ -5,10 +5,20 @@ import { readJSON, writeJSON } from '../lib/cn';
 type Prefs = { theme_mode: 'light' | 'night' | 'system'; accent: string; text_size: string };
 const KEY = 'aura.prefs';
 
+export function isNightTime(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    return true;
+  }
+  // Turn on Soft night automatically after sunset (18:00 / 6:00 PM to 06:00 / 6:00 AM)
+  const hour = new Date().getHours();
+  return hour >= 18 || hour < 6;
+}
+
 function apply(p: Prefs) {
   const el = document.documentElement;
   const night = p.theme_mode === 'night'
-    || (p.theme_mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    || (p.theme_mode === 'system' && isNightTime());
   el.dataset.theme = night ? 'night' : 'light';
   el.dataset.accent = p.accent;
   el.dataset.text = p.text_size;
@@ -27,7 +37,14 @@ export function ThemeSync() {
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const on = () => apply(prefs);
     mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
+
+    // Periodically re-evaluate every minute so sunset triggers theme shift automatically
+    const interval = setInterval(on, 60_000);
+
+    return () => {
+      mq.removeEventListener('change', on);
+      clearInterval(interval);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefs.theme_mode, prefs.accent, prefs.text_size, !!data]);
 

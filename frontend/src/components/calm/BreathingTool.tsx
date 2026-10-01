@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Pause, Play, RotateCcw } from 'lucide-react';
 import { Button } from '../ui-kit/Button';
 import { Segmented } from '../ui-kit/Controls';
+import { CalmSoundPlayer } from './CalmSoundPlayer';
 import { cn } from '../../lib/cn';
 import { en } from '../../copy/en';
 
@@ -89,6 +90,7 @@ export function BreathingTool({ compact }: { compact?: boolean }) {
           {done ? '' : started ? label[phase.kind] : en.calm.ready}
         </p>
       </div>
+      <CalmSoundPlayer />
       {done ? (
         <p className="animate-rise text-center text-lg font-semibold" data-testid="breathing-complete">{en.calm.complete}</p>
       ) : (

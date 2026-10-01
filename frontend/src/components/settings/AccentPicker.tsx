@@ -20,7 +20,7 @@ export function AccentPicker({ value, onChange }: { value: Profile['accent']; on
           aria-label={en.accents[s.key]}
           onClick={() => onChange(s.key)}
           data-testid={`accent-swatch-${s.key}`}
-          className="group flex flex-col items-center gap-1.5"
+          className="group flex flex-col items-center gap-1.5 rounded-2xl p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender"
         >
           <span className={cn(
             'inline-flex h-12 w-12 items-center justify-center rounded-full transition-[transform,box-shadow] duration-200 group-hover:scale-105',

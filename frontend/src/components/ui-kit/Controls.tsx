@@ -12,7 +12,7 @@ export function Switch({ checked, onCheckedChange, id, testId, label }: { checke
       aria-label={label}
       data-testid={testId}
       className={cn(
-        'relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors duration-200',
+        'relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender focus-visible:ring-offset-2',
         checked ? 'bg-sage' : 'bg-line',
       )}
     >
@@ -48,7 +48,7 @@ export function Segmented<V extends string>({ value, onChange, options, name, te
           data-testid={`${testId}-${o.value}`}
           onClick={() => onChange(o.value)}
           className={cn(
-            'min-h-[44px] rounded-full px-4 text-sm font-semibold transition-[background-color,color,box-shadow] duration-200',
+            'min-h-[44px] rounded-full px-4 text-sm font-semibold transition-[background-color,color,box-shadow] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender',
             value === o.value ? 'bg-surface text-ink shadow-soft ring-1 ring-lavender/60' : 'text-ink/80 hover:text-ink',
           )}
         >

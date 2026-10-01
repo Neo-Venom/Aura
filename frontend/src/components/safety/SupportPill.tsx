@@ -12,7 +12,7 @@ export function SupportPill({ className, testId = 'support-pill' }: { className?
       data-testid={testId}
       className={cn(
         'inline-flex min-h-[44px] items-center gap-2 rounded-full bg-lavender/30 px-4 text-sm font-bold text-ink',
-        'transition-[background-color,transform] duration-200 hover:bg-lavender/50 active:scale-[0.98]',
+        'transition-[background-color,transform] duration-200 hover:bg-lavender/50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender',
         className,
       )}
     >

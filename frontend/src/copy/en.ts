@@ -146,6 +146,13 @@ export const en = {
     groundingHint: 'Jot them down if it helps. This stays on your device.',
     groundingDone: "Well done. You're here, right now. Take one slow breath before you go on.",
     finish: 'Finish',
+    sounds: {
+      label: 'Night calm sounds',
+      off: 'Quiet',
+      rain: 'Soft rain',
+      waves: 'Ocean waves',
+      volume: 'Sound volume',
+    },
   },
   settings: {
     title: 'Settings',

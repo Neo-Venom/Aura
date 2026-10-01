@@ -11,7 +11,7 @@ export function SuggestionChips({ onPick }: { onPick(text: string): void }) {
           type="button"
           onClick={() => onPick(c)}
           data-testid={`suggestion-chip-${i}`}
-          className={`min-h-[44px] rounded-full border border-line bg-surface px-5 text-sm font-semibold shadow-soft transition-[background-color,transform] duration-200 hover:-translate-y-0.5 animate-rise ${TINTS[i]}`}
+          className={`min-h-[44px] rounded-full border border-line bg-surface px-5 text-sm font-semibold shadow-soft transition-[background-color,transform] duration-200 hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender animate-rise ${TINTS[i]}`}
           style={{ animationDelay: `${120 + i * 60}ms` }}
         >
           {c}

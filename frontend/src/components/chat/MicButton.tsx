@@ -12,7 +12,7 @@ export function MicButton({ listening, onToggle, disabled }: { listening: boolea
       aria-label={listening ? en.chat.micStop : en.chat.micStart}
       data-testid="chat-mic-button"
       className={cn(
-        'relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-[background-color,color] duration-200',
+        'relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-[background-color,color] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender',
         listening ? 'bg-sage text-on-accent' : 'text-muted hover:bg-soft hover:text-ink',
         'disabled:opacity-50',
       )}

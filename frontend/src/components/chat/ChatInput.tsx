@@ -97,7 +97,7 @@ export function ChatInput({ onSend, onStop, streaming, draftId, seed, autoSendVo
             onClick={onStop}
             aria-label={en.chat.stop}
             data-testid="chat-stop-button"
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink text-canvas transition-transform duration-200 active:scale-95"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink text-canvas transition-transform duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender"
           >
             <Square className="h-4 w-4 fill-current" />
           </button>
@@ -109,7 +109,7 @@ export function ChatInput({ onSend, onStop, streaming, draftId, seed, autoSendVo
             aria-label={en.chat.send}
             data-testid="chat-send-button"
             className={cn(
-              'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-[background-color,transform,opacity] duration-200 active:scale-95',
+              'inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-[background-color,transform,opacity] duration-200 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender',
               empty ? 'bg-soft text-muted' : 'bg-accent-strong text-white',
             )}
           >

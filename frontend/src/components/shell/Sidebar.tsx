@@ -72,7 +72,7 @@ export function Sidebar({ mobile }: { mobile?: boolean }) {
             onClick={() => closeNav(false)}
             data-testid={id}
             className={({ isActive }) => cn(
-              'flex min-h-[44px] items-center gap-3 rounded-full px-4 text-sm font-semibold transition-colors duration-200',
+              'flex min-h-[44px] items-center gap-3 rounded-full px-4 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender',
               isActive ? 'bg-soft' : 'hover:bg-soft/70',
             )}
           >

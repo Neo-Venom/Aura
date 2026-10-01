@@ -11,7 +11,7 @@ export function OptionCard({ index, label, selected, onSelect }: { index: number
       data-testid={`checkin-option-${index}`}
       className={cn(
         'group flex min-h-[56px] w-full items-center gap-4 rounded-3xl border px-5 py-3 text-left text-base font-semibold',
-        'transition-[background-color,border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5',
+        'transition-[background-color,border-color,transform,box-shadow] duration-200 ease-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-lavender',
         selected ? 'border-lavender bg-lavender/35 shadow-soft' : 'border-line bg-surface hover:border-lavender/70 hover:shadow-soft',
       )}
     >
